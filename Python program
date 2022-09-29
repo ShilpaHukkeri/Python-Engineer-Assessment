@@ -1,0 +1,65 @@
+import requests
+import pandas
+from zipfile import ZipFile
+import xml.etree.ElementTree as Xet
+import pandas as pd
+import csv
+
+
+URL = "https://registers.esma.europa.eu/solr/esma_registers_firds_files/select?q=*&fq=publication_date:%5B2021-01-17T00:00:00Z+TO+2021-01-19T23:59:59Z%5D&wt=xml&indent=true&start=0&rows=100"
+response = requests.get(URL)
+with open('feed.xml', 'wb') as file:
+    file.write(response.content)
+    
+# specifying the zip file name
+file_name = 'https://golang.org/dl/go1.17.3.windows-amd64.zip'
+  
+# opening the zip file in READ mode
+with ZipFile(file_name, 'r') as zip:
+
+    # extracting all the files
+    zip.extractall('zip_destination')
+  
+cols = ["FinInstrmGnlAttrbts.Id","FinInstrmGnlAttrbts.FullNm","FinInstrmGnlAttrbts.ClssfctnTp","FinInstrmGnlAttrbts.CmmdtyDerivInd","FinInstrmGnlAttrbts.NtnlCcy","Issr"]
+rows = []
+  
+# Parsing the XML file
+xmlparse = Xet.parse('zip_destination')
+root = xmlparse.getroot()
+for i in root:
+    
+    FinInstrmGnlAttrbts.Id= i.find("FinInstrmGnlAttrbts.Id").text
+    FinInstrmGnlAttrbts.FullNm= i.find("FinInstrmGnlAttrbts.FullNm").text
+    FinInstrmGnlAttrbts.ClssfctnTp = i.find("FinInstrmGnlAttrbts.ClssfctnTp").text
+    FinInstrmGnlAttrbts.CmmdtyDerivInd = i.find("FinInstrmGnlAttrbts.CmmdtyDerivInd").text
+    FinInstrmGnlAttrbts.NtnlCcy = i.find("FinInstrmGnlAttrbts.NtnlCcy").text
+    Issr = i.find('Issr')
+  
+    rows.append({"FinInstrmGnlAttrbts.Id": FinInstrmGnlAttrbts.Id,
+                 "FinInstrmGnlAttrbts.FullNm": FinInstrmGnlAttrbts.FullNm,
+                 "FinInstrmGnlAttrbts.ClssfctnTp": FinInstrmGnlAttrbts.ClssfctnTp,
+                 "FinInstrmGnlAttrbts.CmmdtyDerivInd": FinInstrmGnlAttrbts.CmmdtyDerivInd,
+                 "FinInstrmGnlAttrbts.NtnlCcy": FinInstrmGnlAttrbts.NtnlCcy,
+                 "Issr":Issr})
+  
+df = pd.DataFrame(rows, columns=cols)
+  
+# Writing dataframe to csv
+df.to_csv('DLTINS.csv')
+
+#all other apropriate libs already be loaded in lambda
+#properly calling s3 bucket
+s3 = boto3.resource('s3')
+bucket = s3.Bucket('S3 bucket')
+key = 'DLTINS.csv'
+
+#you would need to grab the file from somewhere. Use this incomplete line below to get started:
+with requests.Session() as s:
+    getfile = s.get('yourfilelocation')
+
+#Only then you can write the data into the '/tmp' folder.
+with open('/tmp/DLTINS.csv', 'w', newline='') as f:
+    w = csv.writer(f)
+    w.writerows(filelist)
+#upload the data into s3
+bucket.upload_file('/tmp/DLTINS.csv', key)
